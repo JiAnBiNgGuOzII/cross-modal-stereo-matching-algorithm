@@ -57,15 +57,15 @@ if __name__ == "__main__":
     calib = load_calibration(calib_path)
     f = calib['K_rgbL'][0, 0]
     
-    # 物理隔离 1：跨模态基线 (RGB Left 到 NIR Right)
+    # 1：跨模态基线 (RGB Left 到 NIR Right)
     C_rgbL = -np.linalg.inv(calib['R_nir2rgb']) @ calib['T_nir2rgb'].reshape(3,1)
     C_nirR = -np.linalg.inv(calib['R_nirR']) @ calib['T_nirR'].reshape(3,1)
     B_cross = np.linalg.norm(C_rgbL - C_nirR)
     
-    # 物理隔离 2：同模态基线 (RGB Left 到 RGB Right)
+    # 2：同模态基线 (RGB Left 到 RGB Right)
     B_homo = np.linalg.norm(calib['T_rgbR'])
     
-    # 初始化 OpenCV SGBM (火力全开模式)
+    # 初始化 OpenCV SGBM
     window_size = 5
     sgbm = cv2.StereoSGBM_create(
         minDisparity=0, numDisparities=128, blockSize=window_size,
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             continue
 
     # ==========================================
-    # 输出终极大作业对比报表
+    # 输出对比
     # ==========================================
     if count_c > 0 and count_s > 0:
         print("\n\n" + "="*60)
