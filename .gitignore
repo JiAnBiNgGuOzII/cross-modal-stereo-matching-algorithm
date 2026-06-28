@@ -1,0 +1,17 @@
+# 忽略大数据集
+*.mat
+*.npy
+ms2_dataset/
+
+# 忽略图片
+*.png
+*.jpg
+
+# 忽略缓存
+__pycache__/
+*.pyc
+
+# 忽略环境配置和输出结果
+stereo_env/
+output_vis/
+final_census_cross_modal.png
