@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import os
 import glob
+import matplotlib.pyplot as plt
 from stereo_algo import build_aggregated_cost_volume, compute_left_right_consistency
 from evaluate_gt import load_calibration, project_lidar_to_depth
 
@@ -37,7 +38,7 @@ def evaluate_metric_aligned(est, gt):
 
 if __name__ == "__main__":
     # ==========================================
-    # 1. 路径配置
+    # 1. 路径配置 (请确认这里是你的正确路径)
     # ==========================================
     dataset_root = "/mnt/hgfs/Win_VMware_share/stereo_project/ms2_dataset" 
     
@@ -51,6 +52,11 @@ if __name__ == "__main__":
     
     # 穿透搜索所有的 png 图像
     rgb_files = sorted(glob.glob(os.path.join(rgb_dir, "**", "*.png"), recursive=True))
+    
+    # ==========================================
+    # 【核心修改】只截取前 100 组数据进行快速验证
+    # ==========================================
+    rgb_files = rgb_files[:100]
     total_files = len(rgb_files)
     
     if total_files == 0:
@@ -59,7 +65,7 @@ if __name__ == "__main__":
         
     print(f"成功扫描到 {total_files} 组数据。")
     print(f"视差图可视化结果将被自动保存在: {output_vis_dir}")
-    print("准备开始批处理 ...")
+    print("准备开始批处理 (前100组快速验证模式) ...")
     
     calib = load_calibration(calib_path)
     f = calib['K_rgbL'][0, 0]
@@ -107,36 +113,18 @@ if __name__ == "__main__":
         disp_est = cv2.medianBlur(disp_est.astype(np.uint8), 7).astype(np.float32)
         # ------------------------------------------
         
-        # 【OpenCV 级专业可视化】：彻底抛弃 Matplotlib
+        # ==========================================
+        # 【画图回归】使用最原本的 plt.imsave 方案
+        #  0 值会自然映射为深蓝色，保留完美的三维层次感
+        # ==========================================
         vis_save_path = os.path.join(output_vis_dir, f"disp_{base_name}.png")
-        valid_mask = disp_est > 0
-        
-        if np.any(valid_mask):
-            # 1. 动态归一化有效视差到 0-255，防止崩溃
-            disp_min = disp_est[valid_mask].min()
-            disp_max = disp_est[valid_mask].max()
-            disp_norm = np.zeros_like(disp_est, dtype=np.uint8)
-            
-            if disp_max > disp_min:
-                norm_vals = (disp_est[valid_mask] - disp_min) / (disp_max - disp_min) * 255.0
-                disp_norm[valid_mask] = norm_vals.astype(np.uint8)
-            else:
-                disp_norm[valid_mask] = 128
-                
-            # 2. 伪彩色映射
-            disp_color = cv2.applyColorMap(disp_norm, cv2.COLORMAP_JET)
-            
-            # 3. 将无效区域强行涂黑
-            disp_color[~valid_mask] = [0, 0, 0]
-            cv2.imwrite(vis_save_path, disp_color)
-        else:
-            # 如果算法全军覆没没有任何匹配点，存一张纯黑图
-            cv2.imwrite(vis_save_path, np.zeros((img_left.shape[0], img_left.shape[1], 3), dtype=np.uint8))
+        plt.imsave(vis_save_path, disp_est, cmap='jet')
 
         try:
             depth_gt = project_lidar_to_depth(lidar_path, calib, img_left.shape)
             disp_gt = np.zeros_like(depth_gt)
             
+            # 过滤异常的雷达脏点
             valid_depth = (depth_gt > 500) & np.isfinite(depth_gt)
             if not np.any(valid_depth):
                 continue
@@ -151,8 +139,8 @@ if __name__ == "__main__":
                 total_d1 += d1_all
                 valid_count += 1
                 
-                # 每 10 组打印一次进度
-                if valid_count % 10 == 0 or idx == total_files - 1:
+                # 每 5 组打印一次进度
+                if valid_count % 5 == 0 or idx == total_files - 1:
                     print(f"-> 已完成 [{valid_count}/{total_files}] 组 | 最新帧 EPE: {epe:.2f} Px, D1: {d1_all:.1f}%")
         except Exception as e:
             continue
